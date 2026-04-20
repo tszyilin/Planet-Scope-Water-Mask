@@ -1,0 +1,13 @@
+# Never commit secrets or large output files
+.streamlit/secrets.toml
+planet_download/
+planet_ndwi/
+planet_shapefiles/
+planet_output/
+*.tif
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+__pycache__/

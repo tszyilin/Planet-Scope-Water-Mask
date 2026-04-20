@@ -1,0 +1,12 @@
+streamlit
+streamlit-folium
+planet
+rasterio
+numpy
+geopandas
+shapely
+pyproj
+folium
+nest_asyncio
+matplotlib
+scikit-image
