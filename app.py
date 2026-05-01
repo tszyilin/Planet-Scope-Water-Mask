@@ -23,7 +23,7 @@ warnings.filterwarnings('ignore', message='.*copy while creating an array.*')
 warnings.filterwarnings('ignore', category=DeprecationWarning)
 warnings.filterwarnings('ignore', message=".*Memory.*driver is deprecated.*")
 
-import asyncio, io, zipfile, tempfile
+import asyncio, io, zipfile, tempfile, threading
 from datetime import datetime, timezone, date
 from pathlib import Path
 
@@ -49,14 +49,34 @@ import folium
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from skimage.filters import threshold_otsu
-import nest_asyncio
+# nest_asyncio removed — replaced with thread-based async runner below
 import streamlit as st
 from streamlit_folium import st_folium
 
 import planet
 from planet import Auth, DataClient, OrdersClient, order_request
 
-nest_asyncio.apply()
+def run(coro):
+    """Run an async coroutine safely from sync Streamlit code.
+    Uses a dedicated thread with its own event loop — works on any
+    Python version without nest_asyncio."""
+    result = [None]
+    error  = [None]
+    def _run():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result[0] = loop.run_until_complete(coro)
+        except Exception as e:
+            error[0] = e
+        finally:
+            loop.close()
+    t = threading.Thread(target=_run)
+    t.start()
+    t.join()
+    if error[0]:
+        raise error[0]
+    return result[0]
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
