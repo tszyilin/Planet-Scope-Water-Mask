@@ -87,6 +87,31 @@ st.set_page_config(
     layout='wide',
 )
 
+# ─────────────────────────────────────────────
+# LOGIN GATE
+# ─────────────────────────────────────────────
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    _, col, _ = st.columns([1, 2, 1])
+    with col:
+        st.markdown('<br><br>', unsafe_allow_html=True)
+        st.title('💧 Water Mask Analyser')
+        st.subheader('Please log in to continue')
+        st.divider()
+        _u = st.text_input('Username')
+        _p = st.text_input('Password', type='password')
+        if st.button('Log in', type='primary', use_container_width=True):
+            _auth = st.secrets.get('auth', {}) if hasattr(st, 'secrets') else {}
+            if (_u == _auth.get('username', '') and
+                    _p == _auth.get('password', '')):
+                st.session_state.logged_in = True
+                st.rerun()
+            else:
+                st.error('Incorrect username or password.')
+    st.stop()
+
 def browse_folder():
     """Open a native folder picker — local only, disabled on Streamlit Cloud."""
     if not _HAS_TKINTER:
@@ -129,6 +154,9 @@ for k, v in _defaults.items():
 with st.sidebar:
     st.title('💧 Water Mask Analyser')
     st.caption('PlanetScope · NDWI · Streamlit')
+    if st.button('🚪 Log out', use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
 
     # API key: use Streamlit Secrets on cloud, editable field locally
     _secret_key = st.secrets.get('PLANET_API_KEY', '') if hasattr(st, 'secrets') else ''
