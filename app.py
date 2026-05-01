@@ -582,22 +582,46 @@ with tab1:
 
         # ── RGB Quicklooks ─────────────────────────────────────────────
         st.subheader('Scene Quicklooks (True Colour RGB)')
-        n_cols = min(len(tif_files), 3)
-        ql_cols = st.columns(n_cols)
-        for i, tif in enumerate(tif_files):
+        # Build a label → file mapping for the dropdown
+        _ql_options = {}
+        for tif in tif_files:
             ds = tif.stem[:8] if tif.stem[:8].isdigit() else tif.stem
             date_fmt = f'{ds[:4]}-{ds[4:6]}-{ds[6:]}' if len(ds) >= 8 else ds
-            with ql_cols[i % n_cols]:
-                st.caption(f'📅 {date_fmt}')
+            # Handle duplicate dates by appending filename suffix
+            label = date_fmt if date_fmt not in _ql_options else f'{date_fmt}  ({tif.stem})'
+            _ql_options[label] = tif
+
+        selected_label = st.selectbox(
+            'Select scene to preview',
+            options=list(_ql_options.keys()),
+            help='Choose a date to display its true-colour RGB preview.',
+        )
+        if selected_label:
+            selected_tif = _ql_options[selected_label]
+            ql_img_col, ql_info_col = st.columns([1, 1])
+            with ql_img_col:
                 try:
-                    fig = make_rgb_thumbnail(tif)
+                    fig = make_rgb_thumbnail(selected_tif)
                     if fig:
                         st.pyplot(fig, clear_figure=True)
                         plt.close(fig)
                     else:
-                        st.info('No preview (< 3 bands)')
+                        st.info('No preview available (fewer than 3 bands).')
                 except Exception as _e:
-                    st.info(f'Preview unavailable: {_e}')
+                    st.warning(f'Preview unavailable: {_e}')
+            with ql_info_col:
+                try:
+                    with rasterio.open(selected_tif) as _src:
+                        st.markdown(f'''
+**File:** `{selected_tif.name}`
+**Size:** {selected_tif.stat().st_size / 1e6:.1f} MB
+**Dimensions:** {_src.width} × {_src.height} px
+**Bands:** {_src.count}
+**CRS:** {_src.crs.to_string() if _src.crs else "Unknown"}
+**Resolution:** {abs(_src.res[0]):.2f} × {abs(_src.res[1]):.2f} m
+                        ''')
+                except Exception:
+                    st.code(str(selected_tif))
     else:
         st.info('No imagery found in the download folder yet. Use the buttons above to download.')
 
