@@ -461,9 +461,9 @@ def make_rgb_thumbnail(tif_path, max_pixels=800):
         h, w = src.height, src.width
         scale = min(1.0, max_pixels / max(h, w))
         oh, ow = max(1, int(h * scale)), max(1, int(w * scale))
-        r = src.read(3, out_shape=(1, oh, ow)).astype(np.float32)[0]
-        g = src.read(2, out_shape=(1, oh, ow)).astype(np.float32)[0]
-        b = src.read(1, out_shape=(1, oh, ow)).astype(np.float32)[0]
+        r = src.read(3, out_shape=(oh, ow)).astype(np.float32)
+        g = src.read(2, out_shape=(oh, ow)).astype(np.float32)
+        b = src.read(1, out_shape=(oh, ow)).astype(np.float32)
         nodata = src.nodata
 
     # Valid pixel mask — a pixel is valid if any band is non-zero / non-nodata
