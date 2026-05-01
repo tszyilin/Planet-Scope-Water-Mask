@@ -10,3 +10,4 @@ folium
 nest_asyncio
 matplotlib
 scikit-image
+pandas
