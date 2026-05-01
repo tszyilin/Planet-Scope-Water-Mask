@@ -103,9 +103,14 @@ if not st.session_state.logged_in:
         _u = st.text_input('Username')
         _p = st.text_input('Password', type='password')
         if st.button('Log in', type='primary', use_container_width=True):
-            _auth = st.secrets.get('auth', {}) if hasattr(st, 'secrets') else {}
-            if (_u == _auth.get('username', '') and
-                    _p == _auth.get('password', '')):
+            # Try Streamlit Cloud secrets first; fall back to defaults if not set
+            try:
+                _correct_u = st.secrets['auth']['username']
+                _correct_p = st.secrets['auth']['password']
+            except Exception:
+                _correct_u = 'PSM_water'
+                _correct_p = 'PSMsurfacewater'
+            if _u == _correct_u and _p == _correct_p:
                 st.session_state.logged_in = True
                 st.rerun()
             else:
