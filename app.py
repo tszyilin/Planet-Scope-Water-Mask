@@ -1,5 +1,5 @@
 """
-Planet Water Mask Analyser — Streamlit Web App
+Planet Scope Viewer — Streamlit Web App
 
 Run with:
     streamlit run app.py
@@ -82,7 +82,7 @@ def run(coro):
 # PAGE CONFIG
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title='Planet Water Mask Analyser',
+    page_title='Planet Scope Viewer',
     page_icon='💧',
     layout='wide',
 )
@@ -97,7 +97,7 @@ if not st.session_state.logged_in:
     _, col, _ = st.columns([1, 2, 1])
     with col:
         st.markdown('<br><br>', unsafe_allow_html=True)
-        st.title('💧 Water Mask Analyser')
+        st.title('💧 Planet Scope Viewer')
         st.subheader('Please log in to continue')
         st.divider()
         _u = st.text_input('Username')
@@ -157,7 +157,7 @@ for k, v in _defaults.items():
 # SIDEBAR
 # ─────────────────────────────────────────────
 with st.sidebar:
-    st.title('💧 Water Mask Analyser')
+    st.title('💧 Planet Scope Viewer')
     st.caption('PlanetScope · NDWI · Streamlit')
     if st.button('🚪 Log out', use_container_width=True):
         st.session_state.logged_in = False
