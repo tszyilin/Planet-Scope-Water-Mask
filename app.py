@@ -249,9 +249,6 @@ with st.sidebar:
     else:
         st.info('☁️ Running on Streamlit Cloud — outputs available via download buttons in the Results tab.')
 
-    st.divider()
-    min_area_m2 = st.number_input('Min polygon area (m²)', value=27, min_value=1)
-
 # Derive AOI geometry (reproject to WGS84 regardless of input EPSG)
 _src_epsg = f'EPSG:{epsg_input}' if epsg_valid else 'EPSG:7850'
 _tf = Transformer.from_crs(_src_epsg, 'EPSG:4326', always_xy=True)
@@ -447,16 +444,62 @@ def zip_geotiffs(output_dir):
             zf.write(f, f.name)
     return buf.getvalue()
 
+def zip_raw_tifs(tif_files):
+    """Zip raw downloaded TIF files for direct user download."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for f in tif_files:
+            zf.write(f, f.name)
+    return buf.getvalue()
+
+def make_rgb_thumbnail(tif_path, max_pixels=600):
+    """Return a matplotlib figure with a true-colour RGB quicklook.
+    PlanetScope band order: 1=Blue, 2=Green, 3=Red, 4=NIR."""
+    with rasterio.open(tif_path) as src:
+        if src.count < 3:
+            return None
+        h, w = src.height, src.width
+        scale = min(1.0, max_pixels / max(h, w))
+        oh, ow = max(1, int(h * scale)), max(1, int(w * scale))
+        r = src.read(3, out_shape=(1, oh, ow)).astype(np.float32)[0]
+        g = src.read(2, out_shape=(1, oh, ow)).astype(np.float32)[0]
+        b = src.read(1, out_shape=(1, oh, ow)).astype(np.float32)[0]
+    def _norm(arr):
+        v = arr[arr > 0]
+        if v.size == 0:
+            return np.zeros_like(arr)
+        lo, hi = np.percentile(v, [2, 98])
+        return np.clip((arr - lo) / max(hi - lo, 1e-6), 0, 1)
+    rgb = np.dstack([_norm(r), _norm(g), _norm(b)])
+    fig, ax = plt.subplots(figsize=(4, 4))
+    ax.imshow(rgb)
+    ax.axis('off')
+    plt.tight_layout(pad=0.1)
+    return fig
+
 # ─────────────────────────────────────────────
-# TABS
+# WORKFLOW BANNER + TABS
 # ─────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(['📥 Download', '📊 Process & Analyse', '🗺️ Results'])
+st.markdown(
+    '<div style="background:#eef4ff;border-left:4px solid #1a73e8;'
+    'border-radius:6px;padding:10px 16px;margin-bottom:10px;font-size:0.95em">'
+    '<b>Workflow &nbsp;—</b> &nbsp;'
+    '<b style="color:#1a73e8">① Download</b> imagery for your AOI &nbsp;→&nbsp; '
+    '<b style="color:#1a73e8">② Analyse</b> water mask (optional) &nbsp;→&nbsp; '
+    '<b style="color:#1a73e8">③ Export</b> results &nbsp;&nbsp;'
+    '<span style="color:#555">· Stop after ① to export raw satellite images only</span>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+tab1, tab2, tab3 = st.tabs(['📥 ① Download & Export', '💧 ② Water Mask Analysis', '🗺️ ③ Results & Export'])
 
 # ══════════════════════════════════════════════
 # TAB 1 — DOWNLOAD
 # ══════════════════════════════════════════════
 with tab1:
-    st.header('Download PlanetScope Imagery')
+    st.header('① Download PlanetScope Imagery')
+    st.caption('Download imagery for your AOI. You can export the raw satellite images here '
+               'without running any analysis.')
     status_box = st.empty()
 
     def update_status(msg):
@@ -512,16 +555,58 @@ with tab1:
     st.session_state.tif_files = tif_files
 
     if tif_files:
-        st.success(f'{len(tif_files)} TIF file(s) ready to process.')
-        with st.expander('Show files'):
+        st.success(f'✅ {len(tif_files)} scene(s) downloaded and ready.')
+
+        # ── Raw imagery export ─────────────────────────────────────────
+        st.subheader('Export Raw Imagery')
+        dl_col, info_col = st.columns([1, 2])
+        with dl_col:
+            raw_zip = zip_raw_tifs(tif_files)
+            st.download_button(
+                '⬇️ Download raw imagery (ZIP)',
+                data=raw_zip,
+                file_name='planetscope_imagery.zip',
+                mime='application/zip',
+                use_container_width=True,
+                help='Downloads all clipped PlanetScope TIF files as a ZIP archive.',
+            )
+        with info_col:
+            st.info(
+                f'**{len(tif_files)} GeoTIFF(s)** — clipped to your AOI, '
+                '4-band PlanetScope (Blue / Green / Red / NIR).\n\n'
+                'For water mask analysis, continue to the **② Water Mask Analysis** tab.'
+            )
+        with st.expander('Show file list'):
             for f in tif_files:
                 st.code(str(f))
+
+        # ── RGB Quicklooks ─────────────────────────────────────────────
+        st.subheader('Scene Quicklooks (True Colour RGB)')
+        n_cols = min(len(tif_files), 3)
+        ql_cols = st.columns(n_cols)
+        for i, tif in enumerate(tif_files):
+            ds = tif.stem[:8] if tif.stem[:8].isdigit() else tif.stem
+            date_fmt = f'{ds[:4]}-{ds[4:6]}-{ds[6:]}' if len(ds) >= 8 else ds
+            with ql_cols[i % n_cols]:
+                st.caption(f'📅 {date_fmt}')
+                try:
+                    fig = make_rgb_thumbnail(tif)
+                    if fig:
+                        st.pyplot(fig, clear_figure=True)
+                        plt.close(fig)
+                    else:
+                        st.info('No preview (< 3 bands)')
+                except Exception as _e:
+                    st.info(f'Preview unavailable: {_e}')
+    else:
+        st.info('No imagery found in the download folder yet. Use the buttons above to download.')
 
 # ══════════════════════════════════════════════
 # TAB 2 — PROCESS & ANALYSE
 # ══════════════════════════════════════════════
 with tab2:
-    st.header('NDWI Processing & Threshold')
+    st.header('② Water Mask Analysis')
+    st.caption('Optional — only needed if you want to extract water polygons / shapefiles.')
 
     c1, c2 = st.columns([1, 2])
     with c1:
@@ -597,8 +682,16 @@ with tab2:
         st.session_state.zip_tif_bytes = zip_geotiffs(ndwi_dir)
         st.session_state.process_done  = True
 
+    with c1:
+        st.divider()
+        min_area_m2 = st.number_input(
+            'Min polygon area (m²)',
+            value=27, min_value=1,
+            help='Removes noise polygons smaller than this area. '
+                 'At 3 m PlanetScope resolution: 9 m² = 1 pixel, 27 m² ≈ 3 pixels.')
+
     if not st.session_state.tif_files:
-        st.warning('No TIF files found. Go to the Download tab first.')
+        st.warning('No TIF files found. Go to the **① Download & Export** tab first.')
     else:
         bc1, bc2 = st.columns(2)
 
@@ -657,10 +750,10 @@ with tab2:
 # TAB 3 — RESULTS
 # ══════════════════════════════════════════════
 with tab3:
-    st.header('Results')
+    st.header('③ Results & Export')
 
     if not st.session_state.process_done:
-        st.info('Run processing in the Process & Analyse tab first.')
+        st.info('Run water mask analysis in the **② Water Mask Analysis** tab first.')
     else:
         # Map
         fmap = make_folium_map(
