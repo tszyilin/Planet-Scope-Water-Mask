@@ -453,7 +453,7 @@ def zip_raw_tifs(tif_files):
     return buf.getvalue()
 
 def make_rgb_thumbnail(tif_path, max_pixels=800):
-    """Return a uint8 (H, W, 3) RGB array for display with st.image().
+    """Return a uint8 (H, W, 3) RGB array cropped to valid data extent.
     PlanetScope band order: 1=Blue, 2=Green, 3=Red, 4=NIR."""
     with rasterio.open(tif_path) as src:
         if src.count < 3:
@@ -465,16 +465,35 @@ def make_rgb_thumbnail(tif_path, max_pixels=800):
         g = src.read(2, out_shape=(1, oh, ow)).astype(np.float32)[0]
         b = src.read(1, out_shape=(1, oh, ow)).astype(np.float32)[0]
         nodata = src.nodata
+
+    # Valid pixel mask — a pixel is valid if any band is non-zero / non-nodata
+    if nodata is not None:
+        valid = (r != nodata) | (g != nodata) | (b != nodata)
+    else:
+        valid = (r > 0) | (g > 0) | (b > 0)
+
     def _norm(arr):
-        mask = (arr != nodata) if nodata is not None else (arr > 0)
-        v = arr[mask]
+        v = arr[valid]
         if v.size == 0:
             return np.zeros_like(arr)
         lo, hi = np.percentile(v, [2, 98])
-        out = np.clip((arr - lo) / max(hi - lo, 1e-6), 0, 1)
-        out[~mask] = 0          # nodata → black
+        out = np.clip((arr - lo) / max(hi - lo, 1e-6), 0, 1).astype(np.float32)
+        out[~valid] = 0
         return out
+
     rgb = np.dstack([_norm(r), _norm(g), _norm(b)])
+
+    # Crop to the bounding box of valid pixels so the image fills the preview
+    rows_ok = np.any(valid, axis=1)
+    cols_ok = np.any(valid, axis=0)
+    if rows_ok.any() and cols_ok.any():
+        r0, r1 = np.where(rows_ok)[0][[0, -1]]
+        c0, c1 = np.where(cols_ok)[0][[0, -1]]
+        pad = max(5, int(min(oh, ow) * 0.02))   # 2% padding
+        r0 = max(0, r0 - pad);  r1 = min(oh - 1, r1 + pad)
+        c0 = max(0, c0 - pad);  c1 = min(ow - 1, c1 + pad)
+        rgb = rgb[r0:r1 + 1, c0:c1 + 1]
+
     return (rgb * 255).astype(np.uint8)
 
 # ─────────────────────────────────────────────
