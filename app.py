@@ -617,30 +617,27 @@ with tab1:
         )
         if selected_label:
             selected_tif = _ql_options[selected_label]
-            ql_img_col, ql_info_col = st.columns([1, 1])
-            with ql_img_col:
-                try:
-                    rgb_arr = make_rgb_thumbnail(selected_tif)
-                    if rgb_arr is not None:
-                        st.image(rgb_arr, use_column_width=True,
-                                 caption=f'True colour RGB — {selected_label}')
-                    else:
-                        st.info('No preview available (fewer than 3 bands).')
-                except Exception as _e:
-                    st.warning(f'Preview unavailable: {_e}')
-            with ql_info_col:
-                try:
-                    with rasterio.open(selected_tif) as _src:
-                        st.markdown(f'''
-**File:** `{selected_tif.name}`
-**Size:** {selected_tif.stat().st_size / 1e6:.1f} MB
-**Dimensions:** {_src.width} × {_src.height} px
-**Bands:** {_src.count}
-**CRS:** {_src.crs.to_string() if _src.crs else "Unknown"}
-**Resolution:** {abs(_src.res[0]):.2f} × {abs(_src.res[1]):.2f} m
-                        ''')
-                except Exception:
-                    st.code(str(selected_tif))
+            try:
+                rgb_arr = make_rgb_thumbnail(selected_tif)
+                if rgb_arr is not None:
+                    st.image(rgb_arr, use_column_width=True,
+                             caption=f'True colour RGB — {selected_label}')
+                else:
+                    st.info('No preview available (fewer than 3 bands).')
+            except Exception as _e:
+                st.warning(f'Preview unavailable: {_e}')
+            try:
+                with rasterio.open(selected_tif) as _src:
+                    st.caption(
+                        f'📄 {selected_tif.name} · '
+                        f'{selected_tif.stat().st_size / 1e6:.1f} MB · '
+                        f'{_src.width} × {_src.height} px · '
+                        f'{_src.count} bands · '
+                        f'{_src.crs.to_epsg() if _src.crs else "?"} · '
+                        f'{abs(_src.res[0]):.1f} m res'
+                    )
+            except Exception:
+                pass
     else:
         st.info('No imagery found in the download folder yet. Use the buttons above to download.')
 
