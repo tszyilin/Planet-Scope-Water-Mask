@@ -452,8 +452,8 @@ def zip_raw_tifs(tif_files):
             zf.write(f, f.name)
     return buf.getvalue()
 
-def make_rgb_thumbnail(tif_path, max_pixels=600):
-    """Return a matplotlib figure with a true-colour RGB quicklook.
+def make_rgb_thumbnail(tif_path, max_pixels=800):
+    """Return a uint8 (H, W, 3) RGB array for display with st.image().
     PlanetScope band order: 1=Blue, 2=Green, 3=Red, 4=NIR."""
     with rasterio.open(tif_path) as src:
         if src.count < 3:
@@ -464,18 +464,18 @@ def make_rgb_thumbnail(tif_path, max_pixels=600):
         r = src.read(3, out_shape=(1, oh, ow)).astype(np.float32)[0]
         g = src.read(2, out_shape=(1, oh, ow)).astype(np.float32)[0]
         b = src.read(1, out_shape=(1, oh, ow)).astype(np.float32)[0]
+        nodata = src.nodata
     def _norm(arr):
-        v = arr[arr > 0]
+        mask = (arr != nodata) if nodata is not None else (arr > 0)
+        v = arr[mask]
         if v.size == 0:
             return np.zeros_like(arr)
         lo, hi = np.percentile(v, [2, 98])
-        return np.clip((arr - lo) / max(hi - lo, 1e-6), 0, 1)
+        out = np.clip((arr - lo) / max(hi - lo, 1e-6), 0, 1)
+        out[~mask] = 0          # nodata → black
+        return out
     rgb = np.dstack([_norm(r), _norm(g), _norm(b)])
-    fig, ax = plt.subplots(figsize=(4, 4))
-    ax.imshow(rgb)
-    ax.axis('off')
-    plt.tight_layout(pad=0.1)
-    return fig
+    return (rgb * 255).astype(np.uint8)
 
 # ─────────────────────────────────────────────
 # WORKFLOW BANNER + TABS
@@ -601,10 +601,10 @@ with tab1:
             ql_img_col, ql_info_col = st.columns([1, 1])
             with ql_img_col:
                 try:
-                    fig = make_rgb_thumbnail(selected_tif)
-                    if fig:
-                        st.pyplot(fig, clear_figure=True)
-                        plt.close(fig)
+                    rgb_arr = make_rgb_thumbnail(selected_tif)
+                    if rgb_arr is not None:
+                        st.image(rgb_arr, use_column_width=True,
+                                 caption=f'True colour RGB — {selected_label}')
                     else:
                         st.info('No preview available (fewer than 3 bands).')
                 except Exception as _e:
