@@ -1,0 +1,18 @@
+name: Keep App Alive
+
+on:
+  schedule:
+    # Ping every day at 8:00 AM UTC (covers weekdays and weekends)
+    - cron: '0 8 * * *'
+  workflow_dispatch:   # Allow manual trigger from GitHub Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Planet Scope Viewer
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            https://planet-scope-water-mask.streamlit.app/)
+          echo "HTTP status: $STATUS"
