@@ -2,8 +2,8 @@ name: Keep App Alive
 
 on:
   schedule:
-    # Ping every day at 8:00 AM UTC (covers weekdays and weekends)
-    - cron: '0 8 * * *'
+    # Ping every 30 minutes
+    - cron: '*/30 * * * *'
   workflow_dispatch:   # Allow manual trigger from GitHub Actions tab
 
 jobs:
