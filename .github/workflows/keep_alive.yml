@@ -13,13 +13,15 @@ jobs:
       - name: Install Playwright
         run: pip install playwright && playwright install chromium --with-deps
 
-      - name: Wake up Planet Scope Viewer
+      - name: Wake up and log in to Planet Scope Viewer
         run: |
           python3 - <<'EOF'
           from playwright.sync_api import sync_playwright
           import time
 
-          URL = "https://planet-scope-water-mask.streamlit.app/"
+          URL      = "https://planet-scope-water-mask.streamlit.app/"
+          USERNAME = "PSM_water"
+          PASSWORD = "PSMsurfacewater"
 
           with sync_playwright() as p:
               browser = p.chromium.launch(headless=True)
@@ -29,18 +31,27 @@ jobs:
               page.goto(URL, timeout=60000, wait_until="domcontentloaded")
               time.sleep(5)
 
-              # If Streamlit shows a "sleeping" screen, click the wake-up button
+              # Click wake-up button if the app is sleeping
               try:
                   btn = page.get_by_text("Yes, get this app back up!", exact=False)
                   if btn.is_visible():
                       btn.click()
                       print("Clicked wake-up button — waiting for app to start...")
-                      page.wait_for_load_state("networkidle", timeout=60000)
+                      time.sleep(15)
               except Exception:
-                  pass   # Button not present — app was already awake
+                  pass
 
-              title = page.title()
-              print(f"Page title: {title}")
+              # Fill in the login form
+              try:
+                  page.get_by_label("Username").fill(USERNAME)
+                  page.get_by_label("Password").fill(PASSWORD)
+                  page.get_by_role("button", name="Log in").click()
+                  print("Logged in ✅")
+                  time.sleep(5)
+              except Exception as e:
+                  print(f"Login step skipped or failed: {e}")
+
+              print(f"Page title: {page.title()}")
               print("App is awake ✅")
               browser.close()
           EOF
