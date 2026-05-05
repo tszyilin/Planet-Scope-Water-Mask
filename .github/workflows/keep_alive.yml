@@ -19,7 +19,7 @@ jobs:
           from playwright.sync_api import sync_playwright
           import time
 
-          URL      = "https://planet-scope-water-mask.streamlit.app/"
+          URL      = "https://planet-scope-water-mask-ruimdlgrctxawn9uyvmer2.streamlit.app/"
           USERNAME = "PSM_water"
           PASSWORD = "PSMsurfacewater"
 
