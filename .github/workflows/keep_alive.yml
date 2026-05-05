@@ -28,7 +28,7 @@ jobs:
               page = browser.new_page()
 
               print(f"Opening {URL} ...")
-              page.goto(URL, timeout=60000, wait_until="domcontentloaded")
+              page.goto(URL, timeout=90000, wait_until="networkidle")
               time.sleep(5)
 
               # Click wake-up button if the app is sleeping
@@ -37,14 +37,16 @@ jobs:
                   if btn.is_visible():
                       btn.click()
                       print("Clicked wake-up button — waiting for app to start...")
-                      time.sleep(30)   # give the app container time to fully boot
+                      page.wait_for_load_state("networkidle", timeout=60000)
+                      time.sleep(10)
               except Exception:
                   pass
 
-              # Fill in the login form — wait up to 60s for it to appear
+              # Fill in the login form — wait for Streamlit to finish rendering
               try:
-                  page.wait_for_selector('input[type="text"]', timeout=60000)
-                  page.locator('input[type="text"]').first.fill(USERNAME)
+                  # Wait for any Streamlit text input wrapper to appear
+                  page.wait_for_selector('[data-testid="stTextInput"]', timeout=60000)
+                  page.locator('[data-testid="stTextInput"] input').first.fill(USERNAME)
                   page.locator('input[type="password"]').fill(PASSWORD)
                   page.get_by_role("button", name="Log in").click()
                   print("Logged in ✅")
