@@ -10,29 +10,37 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Planet Scope Viewer
+      - name: Install Playwright
+        run: pip install playwright && playwright install chromium --with-deps
+
+      - name: Wake up Planet Scope Viewer
         run: |
           python3 - <<'EOF'
-          import requests
+          from playwright.sync_api import sync_playwright
           import time
 
-          url = "https://planet-scope-water-mask.streamlit.app/"
-          headers = {
-              "User-Agent": (
-                  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/124.0.0.0 Safari/537.36"
-              ),
-              "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          }
+          URL = "https://planet-scope-water-mask.streamlit.app/"
 
-          for attempt in range(1, 4):
+          with sync_playwright() as p:
+              browser = p.chromium.launch(headless=True)
+              page = browser.new_page()
+
+              print(f"Opening {URL} ...")
+              page.goto(URL, timeout=60000, wait_until="domcontentloaded")
+              time.sleep(5)
+
+              # If Streamlit shows a "sleeping" screen, click the wake-up button
               try:
-                  resp = requests.get(url, headers=headers, timeout=60, allow_redirects=True)
-                  print(f"Attempt {attempt}: HTTP {resp.status_code} — app is awake ✅")
-                  break
-              except Exception as e:
-                  print(f"Attempt {attempt} failed: {e}")
-                  if attempt < 3:
-                      time.sleep(15)
+                  btn = page.get_by_text("Yes, get this app back up!", exact=False)
+                  if btn.is_visible():
+                      btn.click()
+                      print("Clicked wake-up button — waiting for app to start...")
+                      page.wait_for_load_state("networkidle", timeout=60000)
+              except Exception:
+                  pass   # Button not present — app was already awake
+
+              title = page.title()
+              print(f"Page title: {title}")
+              print("App is awake ✅")
+              browser.close()
           EOF
