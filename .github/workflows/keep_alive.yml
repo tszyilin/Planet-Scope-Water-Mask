@@ -37,14 +37,15 @@ jobs:
                   if btn.is_visible():
                       btn.click()
                       print("Clicked wake-up button — waiting for app to start...")
-                      time.sleep(15)
+                      time.sleep(30)   # give the app container time to fully boot
               except Exception:
                   pass
 
-              # Fill in the login form
+              # Fill in the login form — wait up to 60s for it to appear
               try:
-                  page.get_by_label("Username").fill(USERNAME)
-                  page.get_by_label("Password").fill(PASSWORD)
+                  page.wait_for_selector('input[type="text"]', timeout=60000)
+                  page.locator('input[type="text"]').first.fill(USERNAME)
+                  page.locator('input[type="password"]').fill(PASSWORD)
                   page.get_by_role("button", name="Log in").click()
                   print("Logged in ✅")
                   time.sleep(5)
