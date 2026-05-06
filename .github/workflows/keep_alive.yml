@@ -41,25 +41,37 @@ jobs:
               except Exception:
                   pass
 
-              # Streamlit renders the app inside an iframe — find it
-              app_frame = None
-              for frame in page.frames:
-                  if frame.url != page.url and frame.url.startswith("http"):
-                      print(f"Found frame: {frame.url}")
-                      app_frame = frame
-                      break
+              # Find which frame actually contains the login inputs
+              print("Scanning all frames for inputs...")
+              target = None
+              for i, frame in enumerate(page.frames):
+                  try:
+                      n = frame.locator('input').count()
+                      print(f"  Frame {i} ({frame.url[:80]}): {n} input(s)")
+                      if n > 0 and target is None:
+                          target = frame
+                  except Exception as fe:
+                      print(f"  Frame {i}: error — {fe}")
 
-              target = app_frame if app_frame else page
-              print(f"Using {'iframe' if app_frame else 'main page'}")
+              if target is None:
+                  print("No inputs found in any frame — trying main page")
+                  target = page
 
               # Try to log in
               try:
-                  target.wait_for_selector('input[type="text"]', timeout=30000)
-                  target.locator('input[type="text"]').fill(USERNAME)
-                  target.locator('input[type="password"]').fill(PASSWORD)
-                  target.get_by_role("button", name="Log in").click()
-                  print("Logged in ✅")
-                  time.sleep(5)
+                  target.wait_for_selector('input', timeout=30000)
+                  inputs = target.locator('input').all()
+                  text_inputs   = [x for x in inputs if x.get_attribute('type') in ('text', None, '')]
+                  pw_inputs     = [x for x in inputs if x.get_attribute('type') == 'password']
+                  print(f"Text inputs: {len(text_inputs)}, Password inputs: {len(pw_inputs)}")
+                  if text_inputs and pw_inputs:
+                      text_inputs[0].fill(USERNAME)
+                      pw_inputs[0].fill(PASSWORD)
+                      target.get_by_role("button", name="Log in").click()
+                      print("Logged in ✅")
+                      time.sleep(5)
+                  else:
+                      print("Could not find username/password fields")
               except Exception as e:
                   print(f"Login failed: {e}")
 
