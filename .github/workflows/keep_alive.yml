@@ -41,31 +41,25 @@ jobs:
               except Exception:
                   pass
 
-              # Debug: list every input found on the page
-              all_inputs = page.locator('input').all()
-              print(f"Inputs found on page: {len(all_inputs)}")
-              for i, inp in enumerate(all_inputs):
-                  try:
-                      print(f"  [{i}] type={inp.get_attribute('type')} visible={inp.is_visible()}")
-                  except Exception:
-                      pass
+              # Streamlit renders the app inside an iframe — find it
+              app_frame = None
+              for frame in page.frames:
+                  if frame.url != page.url and frame.url.startswith("http"):
+                      print(f"Found frame: {frame.url}")
+                      app_frame = frame
+                      break
 
-              # Take a screenshot so we can see what the page looks like
-              page.screenshot(path="/tmp/page.png")
-              print("Screenshot saved to /tmp/page.png")
+              target = app_frame if app_frame else page
+              print(f"Using {'iframe' if app_frame else 'main page'}")
 
-              # Try to log in using whatever inputs are visible
+              # Try to log in
               try:
-                  visible_inputs = [inp for inp in all_inputs if inp.is_visible()]
-                  if len(visible_inputs) >= 2:
-                      visible_inputs[0].fill(USERNAME)
-                      visible_inputs[1].fill(PASSWORD)
-                      page.get_by_role("button", name="Log in").click()
-                      print("Logged in ✅")
-                  elif len(visible_inputs) == 1:
-                      print("Only 1 input visible — cannot fill login form yet")
-                  else:
-                      print("No visible inputs found")
+                  target.wait_for_selector('input[type="text"]', timeout=30000)
+                  target.locator('input[type="text"]').fill(USERNAME)
+                  target.locator('input[type="password"]').fill(PASSWORD)
+                  target.get_by_role("button", name="Log in").click()
+                  print("Logged in ✅")
+                  time.sleep(5)
               except Exception as e:
                   print(f"Login failed: {e}")
 
