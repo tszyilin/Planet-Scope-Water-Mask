@@ -28,8 +28,8 @@ jobs:
               page = browser.new_page()
 
               print(f"Opening {URL} ...")
-              page.goto(URL, timeout=90000, wait_until="networkidle")
-              time.sleep(5)
+              page.goto(URL, timeout=90000, wait_until="domcontentloaded")
+              time.sleep(30)   # wait for Streamlit React to fully render
 
               # Click wake-up button if the app is sleeping
               try:
@@ -37,22 +37,37 @@ jobs:
                   if btn.is_visible():
                       btn.click()
                       print("Clicked wake-up button — waiting for app to start...")
-                      page.wait_for_load_state("networkidle", timeout=60000)
-                      time.sleep(10)
+                      time.sleep(30)
               except Exception:
                   pass
 
-              # Fill in the login form — wait for Streamlit to finish rendering
+              # Debug: list every input found on the page
+              all_inputs = page.locator('input').all()
+              print(f"Inputs found on page: {len(all_inputs)}")
+              for i, inp in enumerate(all_inputs):
+                  try:
+                      print(f"  [{i}] type={inp.get_attribute('type')} visible={inp.is_visible()}")
+                  except Exception:
+                      pass
+
+              # Take a screenshot so we can see what the page looks like
+              page.screenshot(path="/tmp/page.png")
+              print("Screenshot saved to /tmp/page.png")
+
+              # Try to log in using whatever inputs are visible
               try:
-                  # Wait for any Streamlit text input wrapper to appear
-                  page.wait_for_selector('[data-testid="stTextInput"]', timeout=60000)
-                  page.locator('[data-testid="stTextInput"] input').first.fill(USERNAME)
-                  page.locator('input[type="password"]').fill(PASSWORD)
-                  page.get_by_role("button", name="Log in").click()
-                  print("Logged in ✅")
-                  time.sleep(5)
+                  visible_inputs = [inp for inp in all_inputs if inp.is_visible()]
+                  if len(visible_inputs) >= 2:
+                      visible_inputs[0].fill(USERNAME)
+                      visible_inputs[1].fill(PASSWORD)
+                      page.get_by_role("button", name="Log in").click()
+                      print("Logged in ✅")
+                  elif len(visible_inputs) == 1:
+                      print("Only 1 input visible — cannot fill login form yet")
+                  else:
+                      print("No visible inputs found")
               except Exception as e:
-                  print(f"Login step skipped or failed: {e}")
+                  print(f"Login failed: {e}")
 
               print(f"Page title: {page.title()}")
               print("App is awake ✅")
